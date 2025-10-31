@@ -1,4 +1,45 @@
-# OpenAI Agents SDK (JavaScript/TypeScript)
+# OpenAI Agents SDK (JavaScript/import xlsxwriter
+
+# Création d'un modèle Excel pour le livret expert Renault
+fichier_excel_livret = "/mnt/data/Livret_Expert_Garantie_Renault.xlsx"
+
+workbook = xlsxwriter.Workbook(fichier_excel_livret)
+
+# Feuille Suivi dossiers
+ws_suivi = workbook.add_worksheet("Suivi dossiers")
+colonnes_suivi = [
+    "Date", "Client", "VIN", "Immat", "Km", "Type dossier",
+    "Référence Actis/OTS", "Montant devis", "% Renault",
+    "% Atelier", "% Client", "Résultat", "Statut", "Commentaire"
+]
+for col_num, col_name in enumerate(colonnes_suivi):
+    ws_suivi.write(0, col_num, col_name)
+
+# Feuille Checklist
+ws_checklist = workbook.add_worksheet("Checklist dossier")
+checklist_items = [
+    "VIN et immatriculation",
+    "Historique entretien complet",
+    "Photos du défaut",
+    "Devis atelier détaillé",
+    "Codes TSB / campagne rappel",
+    "Commentaire atelier clair"
+]
+for row_num, item in enumerate(checklist_items):
+    ws_checklist.write(row_num, 0, item)
+
+# Feuille Fiche dossier constructeur
+ws_fiche = workbook.add_worksheet("Fiche dossier constructeur")
+champs_fiche = [
+    "Identifiant dossier", "Date", "Client", "VIN", "Immat", "Km",
+    "Type dossier", "Référence Actis/OTS", "Historique entretien",
+    "Commentaire atelier", "Photos"
+]
+for row_num, champ in enumerate(champs_fiche):
+    ws_fiche.write(row_num, 0, champ)
+
+workbook.close()
+fichier_excel_livret
 
 [![npm version](https://badge.fury.io/js/@openai%2Fagents.svg)](https://badge.fury.io/js/@openai%2Fagents)
 [![CI](https://github.com/openai/openai-agents-js/actions/workflows/test.yml/badge.svg)](https://github.com/openai/openai-agents-js/actions/workflows/test.yml)
