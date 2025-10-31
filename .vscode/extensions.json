@@ -2,3 +2,96 @@
   "recommendations": ["astro-build.astro-vscode", "vitest.explorer"],
   "unwantedRecommendations": []
 }
+import streamlit as st
+import pandas as pd
+from io import BytesIO
+import plotly.express as px
+
+st.set_page_config(page_title="Facturation Garantie Renault", layout="wide")
+st.title("🚗 Optimisation Facturation Garantie Renault - WebApp Mobile")
+
+# --- INITIALISATION DES DONNÉES ---
+if "df_interventions" not in st.session_state:
+    st.session_state.df_interventions = pd.DataFrame(columns=[
+        "Date", "Immatriculation", "Client", "Marque/Modèle", "Type d’intervention",
+        "Code défaut / DTC", "Temps réel passé (h)", "Temps barème Renault (h)",
+        "Pièces remboursables (€)", "Main-d’œuvre remboursable (€)", "Total facturable (€)",
+        "Statut demande", "Observations"
+    ])
+
+# --- BARÈME RENAULT ---
+bareme = {
+    "Diagnostic électronique": {"durée": 1.5, "taux": 55},
+    "Remplacement pièce simple": {"durée": 0.5, "taux": 55},
+    "Remplacement pièce complexe": {"durée": 2.0, "taux": 55},
+    "Révision générale": {"durée": 3.0, "taux": 55}
+}
+
+# --- FORMULAIRE D'INTERVENTION ---
+st.header("Ajouter une intervention")
+with st.form("intervention_form"):
+    date = st.date_input("Date de l'intervention")
+    immatriculation = st.text_input("Immatriculation")
+    client = st.text_input("Nom du client")
+    marque_modele = st.text_input("Marque / Modèle")
+    type_interv = st.selectbox("Type d’intervention", list(bareme.keys()))
+    dtc = st.text_input("Code défaut / DTC")
+    temps_reel = st.number_input("Temps réel passé (h)", min_value=0.0)
+    pieces = st.number_input("Pièces remboursables (€)", min_value=0.0)
+    main_oeuvre = bareme[type_interv]["durée"] * bareme[type_interv]["taux"]
+    statut = st.selectbox("Statut demande", ["Accepté", "Refusé"])
+    observations = st.text_area("Observations")
+    submitted = st.form_submit_button("Ajouter l'intervention")
+
+    if submitted:
+        new_data = {
+            "Date": date,
+            "Immatriculation": immatriculation,
+            "Client": client,
+            "Marque/Modèle": marque_modele,
+            "Type d’intervention": type_interv,
+            "Code défaut / DTC": dtc,
+            "Temps réel passé (h)": temps_reel,
+            "Temps barème Renault (h)": bareme[type_interv]["durée"],
+            "Pièces remboursables (€)": pieces,
+            "Main-d’œuvre remboursable (€)": main_oeuvre,
+            "Total facturable (€)": pieces + main_oeuvre,
+            "Statut demande": statut,
+            "Observations": observations
+        }
+        st.session_state.df_interventions = pd.concat(
+            [st.session_state.df_interventions, pd.DataFrame([new_data])], ignore_index=True
+        )
+        st.success("Intervention ajoutée !")
+
+# --- TABLEAU DES INTERVENTIONS ---
+if not st.session_state.df_interventions.empty:
+    st.subheader("📋 Liste des interventions")
+    st.dataframe(st.session_state.df_interventions)
+
+    # --- KPI PAR MOIS ---
+    st.subheader("📊 KPI par mois")
+    df = st.session_state.df_interventions.copy()
+    df["Mois"] = pd.to_datetime(df["Date"]).dt.to_period("M")
+    kpi = df.groupby("Mois").apply(lambda x: pd.Series({
+        "Total interventions": len(x),
+        "Total accepté (€)": x.loc[x["Statut demande"]=="Accepté","Total facturable (€)"].sum(),
+        "Total refusé (€)": x.loc[x["Statut demande"]=="Refusé","Total facturable (€)"].sum(),
+        "Taux succès (%)": (len(x[x["Statut demande"]=="Accepté"]) / len(x)*100) if len(x) > 0 else 0
+    })).reset_index()
+    st.dataframe(kpi)
+
+    # --- GRAPHIQUES ---
+    st.subheader("📈 Visualisation KPI")
+    fig = px.bar(kpi, x="Mois", y=["Total interventions", "Total accepté (€)", "Total refusé (€)"],
+                 barmode="group", title="KPI Interventions par Mois")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # --- EXPORT EXCEL ---
+    st.subheader("💾 Exporter les données")
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        st.session_state.df_interventions.to_excel(writer, sheet_name="Interventions", index=False)
+        kpi.to_excel(writer, sheet_name="Analyse KPI", index=False)
+    st.download_button("Télécharger Excel", data=buffer.getvalue(),
+                       file_name="Facturation_Garantie_Renault.xlsx")
